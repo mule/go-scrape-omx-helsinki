@@ -1,0 +1,10 @@
+LET doc = DOCUMENT('https://www.kauppalehti.fi/porssi/indeksit/OMXHPI', {driver: "cdp"})
+ WAIT_ELEMENT(doc, '.stock-list', 5000)
+ LET stockNameLinks = ELEMENTS(doc, '.stock-name-link')
+ FOR stockNameLink IN stockNameLinks
+  LET stockName = stockNameLink.innerText
+  LET link =stockNameLink.attributes.href
+  RETURN {
+    name: stockName,
+    link: link
+  }
