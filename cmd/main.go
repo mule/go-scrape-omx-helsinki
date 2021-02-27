@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/MontFerret/ferret/pkg/compiler"
 	"github.com/MontFerret/ferret/pkg/drivers"
@@ -12,25 +14,40 @@ import (
 	"github.com/MontFerret/ferret/pkg/drivers/http"
 )
 
-type Stock struct {
+type ScrapedStockData struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
 }
 
+type Company struct {
+	Name   string `json:"name"`
+	Ticker string `json:"ticker"`
+}
+
 func main() {
-	listedStocks, err := getListedStocks()
+
+	companies := make([]Company, 0)
+	stockData, err := scrapeStockData()
 
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	for _, s := range listedStocks {
-		fmt.Println(fmt.Sprintf("%s: %s", s.Name, s.URL))
+	for _, s := range stockData {
+		urlPathParts := strings.Split(s.URL, "/")
+
+		ticker := urlPathParts[len(urlPathParts)-1]
+		companies = append(companies, Company{Name: s.Name, Ticker: ticker})
+
+		file, _ := json.MarshalIndent(companies, "", " ")
+
+		_ = ioutil.WriteFile("companies.json", file, 0644)
 	}
+
 }
 
-func getListedStocks() ([]Stock, error) {
+func scrapeStockData() ([]ScrapedStockData, error) {
 	query := `
 						LET doc = DOCUMENT('https://www.kauppalehti.fi/porssi/indeksit/OMXHPI', {driver: "cdp"})
 						WAIT_ELEMENT(doc, '.stock-list', 5000)
@@ -44,7 +61,6 @@ func getListedStocks() ([]Stock, error) {
 						}
 			}
 	`
-
 	comp := compiler.New()
 
 	program, err := comp.Compile(query)
@@ -69,7 +85,7 @@ func getListedStocks() ([]Stock, error) {
 		return nil, err
 	}
 
-	res := make([]Stock, 100)
+	res := make([]ScrapedStockData, 100)
 
 	err = json.Unmarshal(out, &res)
 
